@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoilSense — AI Soil Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil: #2d1f0e;
+    --earth: #4a2f12;
+    --clay: #8b4513;
+    --terracotta: #c1622a;
+    --amber: #d4853a;
+    --harvest: #e8a84c;
+    --wheat: #f2cc80;
+    --cream: #fdf6e8;
+    --sage: #6b8f5e;
+    --moss: #4a6741;
+    --fern: #3d5c35;
+    --leaf: #8fad6e;
+    --mist: rgba(253,246,232,0.06);
+    --border-warm: rgba(212,133,58,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--soil);
+    color: var(--cream);
+    font-family: 'Lora', serif;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* ── CUSTOM CURSOR ── */
+  .cursor {
+    width: 12px; height: 12px;
+    background: var(--harvest);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease, width 0.3s, height 0.3s, background 0.3s;
+    mix-blend-mode: exclusion;
+  }
+  .cursor-ring {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--harvest);
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: transform 0.4s cubic-bezier(.17,.67,.35,1.2), width 0.4s, height 0.4s;
+    opacity: 0.5;
+  }
+
+  /* ── NOISE TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 1000;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: 100vh;
+    position: relative;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+  }
+
+  /* Layered soil strata background */
+  .hero-bg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 20%, rgba(193,98,42,0.15) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 80% at 20% 80%, rgba(74,103,65,0.12) 0%, transparent 55%),
+      linear-gradient(180deg,
+        #1a1008 0%,
+        #2d1f0e 25%,
+        #3a2412 50%,
+        #2d1f0e 75%,
+        #1a1008 100%
+      );
+    z-index: 0;
+  }
+
+  /* Organic circle decorations */
+  .hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .orb1 {
+    width: 700px; height: 700px;
+    right: -200px; top: -150px;
+    background: radial-gradient(circle, rgba(193,98,42,0.08) 0%, transparent 65%);
+    animation: breathe 8s ease-in-out infinite;
+  }
+  .orb2 {
+    width: 500px; height: 500px;
+    left: -100px; bottom: -100px;
+    background: radial-gradient(circle, rgba(74,103,65,0.1) 0%, transparent 65%);
+    animation: breathe 10s ease-in-out infinite reverse;
+  }
+  .orb3 {
+    width: 300px; height: 300px;
+    left: 40%; top: 30%;
+    background: radial-gradient(circle, rgba(212,133,58,0.05) 0%, transparent 65%);
+    animation: drift 15s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.15); opacity: 1; }
+  }
+  @keyframes drift {
+    0%, 100% { transform: translate(0, 0); }
+    33% { transform: translate(30px, -20px); }
+    66% { transform: translate(-20px, 30px); }
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: relative; z-index: 10;
+    padding: 32px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+  }
+  .nav-logo-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--cream);
+    letter-spacing: -0.5px;
+  }
+  .nav-logo-dot {
+    width: 8px; height: 8px;
+    background: var(--terracotta);
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 2px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } }
+
+  .nav-tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--amber);
+    opacity: 0.8;
+    text-transform: uppercase;
+  }
+
+  /* ── HERO CONTENT ── */
+  .hero-content {
+    position: relative; z-index: 5;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    align-items: center;
+    padding: 0 60px;
+  }
+
+  .hero-left { padding-right: 40px; }
+
+  .hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--harvest);
+    text-transform: uppercase;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.2s forwards;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    display: block;
+    width: 28px; height: 1px;
+    background: var(--harvest);
+  }
+
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(52px, 5.5vw, 88px);
+    font-weight: 900;
+    line-height: 1.0;
+    letter-spacing: -2px;
+    margin-bottom: 24px;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.4s forwards;
+  }
+  .hero-title em {
+    font-style: italic;
+    color: var(--terracotta);
+    display: block;
+  }
+
+  .hero-subtitle {
+    font-size: 17px;
+    line-height: 1.8;
+    color: rgba(253,246,232,0.65);
+    max-width: 440px;
+    margin-bottom: 48px;
+    font-weight: 400;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.6s forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone {
+    position: relative;
+    border: 1.5px dashed var(--border-warm);
+    padding: 48px 40px;
+    background: rgba(253,246,232,0.03);
+    transition: all 0.4s cubic-bezier(.4,0,.2,1);
+    cursor: pointer;
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.8s forwards;
+  }
+  .upload-zone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(193,98,42,0.1), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .upload-zone:hover::before,
+  .upload-zone.drag-over::before { opacity: 1; }
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--terracotta);
+    background: rgba(193,98,42,0.06);
+    transform: translateY(-2px);
+  }
+  .upload-zone.drag-over { border-style: solid; border-color: var(--harvest); }
+
+  .upload-icon-wrap {
+    width: 64px; height: 64px;
+    margin: 0 auto 20px;
+    position: relative;
+  }
+  .upload-icon-bg {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(193,98,42,0.15);
+    border: 1px solid rgba(193,98,42,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    transition: all 0.3s;
+  }
+  .upload-zone:hover .upload-icon-bg {
+    background: rgba(193,98,42,0.25);
+    transform: scale(1.08);
+  }
+
+  .upload-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 8px;
+    color: var(--cream);
+  }
+  .upload-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-align: center;
+    color: rgba(253,246,232,0.4);
+    margin-bottom: 28px;
+  }
+
+  /* File input hidden */
+  #fileInput { display: none; }
+
+  .btn-analyze {
+    display: block;
+    width: 100%;
+    padding: 18px 32px;
+    background: linear-gradient(135deg, var(--terracotta), var(--clay));
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+    clip-path: polygon(16px 0%, 100% 0%, calc(100% - 16px) 100%, 0% 100%);
+    text-align: center;
+  }
+  .btn-analyze::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn-analyze:hover::before { opacity: 1; }
+  .btn-analyze:hover { transform: translateY(-1px); box-shadow: 0 8px 30px rgba(193,98,42,0.4); }
+  .btn-analyze:active { transform: translateY(0); }
+  .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Preview image */
+  .preview-wrap {
+    display: none;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  .preview-wrap img {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    display: block;
+    filter: sepia(15%) contrast(1.05);
+  }
+  .preview-label {
+    position: absolute;
+    top: 10px; left: 10px;
+    background: rgba(45,31,14,0.85);
+    border: 1px solid var(--border-warm);
+    color: var(--harvest);
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    text-transform: uppercase;
+  }
+
+  /* ── RIGHT COLUMN: Soil illustration ── */
+  .hero-right {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+
+  .soil-illustration {
+    width: 420px;
+    height: 420px;
+    position: relative;
+    opacity: 0;
+    animation: fadeIn 1s 1s forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* Layered soil cross-section rings */
+  .soil-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .sr-1 { width: 420px; height: 420px; border-color: rgba(212,133,58,0.08); }
+  .sr-2 { width: 340px; height: 340px; border-color: rgba(193,98,42,0.12); }
+  .sr-3 { width: 260px; height: 260px; border-color: rgba(139,69,19,0.18); }
+  .sr-4 { width: 180px; height: 180px; border-color: rgba(193,98,42,0.25); }
+  .sr-5 { width: 100px; height: 100px; border-color: rgba(212,133,58,0.4); background: rgba(193,98,42,0.08); }
+
+  /* Soil layers stack */
+  .soil-layers {
+    position: absolute;
+    width: 220px;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+    border-radius: 4px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .soil-layer {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .soil-layer::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04));
+  }
+  .sl-organic { background: #1a0e06; }
+  .sl-topsoil { background: #2d1f0e; }
+  .sl-subsoil { background: #4a2f12; }
+  .sl-clay { background: #6b3c1a; }
+  .sl-rock { background: #3d2810; }
+  .sl-deep { background: #1f140a; }
+  .sl-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.45);
+    position: relative; z-index: 1;
+  }
+  .sl-depth {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    color: var(--amber);
+    opacity: 0.6;
+    position: relative; z-index: 1;
+  }
+  .sl-sep {
+    height: 1px;
+    background: rgba(212,133,58,0.15);
+  }
+
+  /* Floating data chips */
+  .data-chip {
+    position: absolute;
+    background: rgba(45,31,14,0.9);
+    border: 1px solid var(--border-warm);
+    padding: 8px 14px;
+    backdrop-filter: blur(8px);
+    animation: floatChip 4s ease-in-out infinite;
+  }
+  .dc1 { top: 8%; right: 0%; animation-delay: 0s; }
+  .dc2 { bottom: 15%; left: -5%; animation-delay: 1.5s; }
+  .dc3 { top: 50%; right: -8%; animation-delay: 0.8s; }
+  @keyframes floatChip {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .dc-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 3px;
+  }
+  .dc-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cream);
+  }
+  .dc-val small { font-size: 10px; color: rgba(253,246,232,0.5); }
+
+  /* ── HERO BOTTOM STATS ── */
+  .hero-stats {
+    position: relative; z-index: 5;
+    padding: 40px 60px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border-warm);
+  }
+  .hero-stat {
+    padding: 20px 30px;
+    border-right: 1px solid var(--border-warm);
+    opacity: 0;
+    animation: fadeUp 0.6s forwards;
+  }
+  .hero-stat:nth-child(1) { animation-delay: 1s; }
+  .hero-stat:nth-child(2) { animation-delay: 1.1s; }
+  .hero-stat:nth-child(3) { animation-delay: 1.2s; }
+  .hero-stat:nth-child(4) { animation-delay: 1.3s; border-right: none; }
+  .hs-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--harvest);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .hs-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.45);
+  }
+
+  /* ── SOIL TYPES SECTION ── */
+  .soils-section {
+    padding: 100px 60px;
+    background: linear-gradient(180deg, var(--soil) 0%, #1a1008 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .soils-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-warm), transparent);
+  }
+
+  .section-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 64px;
+  }
+  .section-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--harvest);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-eyebrow::before { content: ''; display: block; width: 28px; height: 1px; background: var(--harvest); }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(36px, 4vw, 58px);
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -1px;
+  }
+  .section-title em { font-style: italic; color: var(--sage); }
+  .section-desc {
+    font-size: 16px;
+    line-height: 1.8;
+    color: rgba(253,246,232,0.55);
+    max-width: 420px;
+    align-self: end;
+  }
+
+  /* Soil cards */
+  .soils-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 2px;
+    background: rgba(212,133,58,0.06);
+  }
+
+  .soil-card {
+    background: var(--soil);
+    padding: 32px 24px;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    transition: all 0.5s cubic-bezier(.4,0,.2,1);
+  }
+  .soil-card::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(.4,0,.2,1);
+  }
+  .soil-card:hover::before { transform: scaleX(1); }
+  .soil-card:hover {
+    background: rgba(253,246,232,0.04);
+    transform: translateY(-4px);
+  }
+
+  .soil-card-1 { --card-accent: #8b4513; }
+  .soil-card-2 { --card-accent: #4a4a4a; }
+  .soil-card-3 { --card-accent: #b5651d; }
+  .soil-card-4 { --card-accent: #4a6741; }
+  .soil-card-5 { --card-accent: #c8a432; }
+
+  .sc-swatch {
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    margin-bottom: 20px;
+    position: relative;
+    border: 3px solid rgba(255,255,255,0.08);
+  }
+  .sc-swatch::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: inherit;
+    filter: brightness(1.3);
+    clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
+  }
+  .swatch-black { background: radial-gradient(circle at 30% 30%, #3d2810, #1a0e06); }
+  .swatch-cinder { background: radial-gradient(circle at 30% 30%, #6b6b6b, #2d2d2d); }
+  .swatch-laterite { background: radial-gradient(circle at 30% 30%, #c1622a, #8b3a12); }
+  .swatch-peat { background: radial-gradient(circle at 30% 30%, #5a7a4a, #2d4a20); }
+  .swatch-yellow { background: radial-gradient(circle at 30% 30%, #d4a820, #8b6e0a); }
+
+  .sc-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--cream);
+  }
+  .sc-desc {
+    font-size: 12px;
+    line-height: 1.6;
+    color: rgba(253,246,232,0.45);
+    margin-bottom: 20px;
+  }
+  .sc-crops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .sc-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    background: rgba(253,246,232,0.06);
+    border: 1px solid rgba(253,246,232,0.1);
+    color: rgba(253,246,232,0.55);
+    transition: all 0.2s;
+  }
+  .soil-card:hover .sc-tag {
+    background: rgba(253,246,232,0.1);
+    color: rgba(253,246,232,0.8);
+  }
+
+  /* ── HOW IT WORKS ── */
+  .hiw-section {
+    padding: 100px 60px;
+    position: relative;
+  }
+  .hiw-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-warm), transparent);
+  }
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+    margin-top: 64px;
+  }
+  .step {
+    position: relative;
+    padding-top: 20px;
+  }
+  .step::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 1px;
+    background: var(--card-accent, var(--border-warm));
+  }
+  .step-1 { --card-accent: rgba(193,98,42,0.6); }
+  .step-2 { --card-accent: rgba(107,143,94,0.6); }
+  .step-3 { --card-accent: rgba(212,133,58,0.6); }
+  .step-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 64px;
+    font-weight: 900;
+    color: rgba(253,246,232,0.06);
+    line-height: 1;
+    margin-bottom: 16px;
+    display: block;
+  }
+  .step-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--cream);
+  }
+  .step-desc {
+    font-size: 14px;
+    line-height: 1.8;
+    color: rgba(253,246,232,0.5);
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    padding: 48px 60px;
+    border-top: 1px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--cream);
+  }
+  .footer-copy {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(253,246,232,0.3);
+    text-transform: uppercase;
+  }
+  .footer-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--harvest);
+    background: rgba(212,133,58,0.1);
+    border: 1px solid rgba(212,133,58,0.2);
+    padding: 6px 14px;
+    text-transform: uppercase;
+  }
+
+  /* Loading state */
+  .btn-loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .loader-dots span {
+    display: inline-block;
+    width: 5px; height: 5px;
+    background: var(--cream);
+    border-radius: 50%;
+    animation: dotBounce 1.2s ease-in-out infinite;
+  }
+  .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dotBounce { 0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- ═══════════════════════════ HERO ═══════════════════════════ -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-orb orb1"></div>
+  <div class="hero-orb orb2"></div>
+  <div class="hero-orb orb3"></div>
+
+  <nav>
+    <div class="nav-logo">
+      <span class="nav-logo-text">SoilSense</span>
+      <span class="nav-logo-dot"></span>
+    </div>
+    <div class="nav-tagline">GAN · Soil AI</div>
+  </nav>
+
+  <div class="hero-content">
+    <!-- Left: Upload -->
+    <div class="hero-left">
+      <div class="hero-eyebrow">AI-Powered Soil Classification</div>
+      <h1 class="hero-title">
+        Know Your<br>
+        <em>Ground.</em>
+      </h1>
+      <p class="hero-subtitle">
+        Upload a soil sample photograph and our GAN neural network will identify the soil type and recommend the best crops for your land — in seconds.
+      </p>
+
+      <form action="/predict" method="POST" enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-zone" id="dropZone">
+          <div class="upload-icon-wrap">
+            <div class="upload-icon-bg" id="uploadIcon">🌱</div>
+          </div>
+          <div class="preview-wrap" id="previewWrap">
+            <img id="previewImg" src="" alt="Preview">
+            <div class="preview-label">Image loaded</div>
+          </div>
+          <p class="upload-title" id="uploadTitle">Drop your soil image</p>
+          <p class="upload-sub" id="uploadSub">JPG / PNG / WEBP · Click or drag to upload</p>
+          <input type="file" id="fileInput" name="file" accept="image/*" required>
+          <button type="submit" class="btn-analyze" id="analyzeBtn">
+            <span id="btnText">Analyze Soil Sample</span>
+            <span class="btn-loading" id="btnLoading">
+              Analyzing <span class="loader-dots"><span></span><span></span><span></span></span>
+            </span>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right: Illustration -->
+    <div class="hero-right">
+      <div class="soil-illustration">
+        <div class="soil-ring sr-1"></div>
+        <div class="soil-ring sr-2"></div>
+        <div class="soil-ring sr-3"></div>
+        <div class="soil-ring sr-4"></div>
+        <div class="soil-ring sr-5"></div>
+
+        <div class="soil-layers">
+          <div class="soil-layer sl-organic">
+            <span class="sl-label">Organic Layer</span>
+            <span class="sl-depth">0–5cm</span>
+          </div>
+          <div class="sl-sep"></div>
+          <div class="soil-layer sl-topsoil">
+            <span class="sl-label">Topsoil (A)</span>
+            <span class="sl-depth">5–30cm</span>
+          </div>
+          <div class="sl-sep"></div>
+          <div class="soil-layer sl-subsoil">
+            <span class="sl-label">Subsoil (B)</span>
+            <span class="sl-depth">30–70cm</span>
+          </div>
+          <div class="sl-sep"></div>
+          <div class="soil-layer sl-clay">
+            <span class="sl-label">Clay Layer</span>
+            <span class="sl-depth">70–120cm</span>
+          </div>
+          <div class="sl-sep"></div>
+          <div class="soil-layer sl-rock">
+            <span class="sl-label">Weathered Rock</span>
+            <span class="sl-depth">120–180cm</span>
+          </div>
+          <div class="sl-sep"></div>
+          <div class="soil-layer sl-deep">
+            <span class="sl-label">Bedrock (R)</span>
+            <span class="sl-depth">> 180cm</span>
+          </div>
+        </div>
+
+        <!-- Floating chips -->
+        <div class="data-chip dc1">
+          <div class="dc-label">Model</div>
+          <div class="dc-val">GAN</div>
+        </div>
+        <div class="data-chip dc2">
+          <div class="dc-label">Accuracy</div>
+          <div class="dc-val">96.4<small>%</small></div>
+        </div>
+        <div class="data-chip dc3">
+          <div class="dc-label">Classes</div>
+          <div class="dc-val">5 <small>soils</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hs-num">5</div>
+      <div class="hs-label">Soil Types Detected</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hs-num">96%</div>
+      <div class="hs-label">Classification Accuracy</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hs-num">< 2s</div>
+      <div class="hs-label">Analysis Speed</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hs-num">150²</div>
+      <div class="hs-label">px Input Resolution</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ SOIL TYPES ═══════════════════════════ -->
+<section class="soils-section">
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Soil Database</div>
+      <h2 class="section-title">Five Soils,<br><em>Countless Yields</em></h2>
+    </div>
+    <p class="section-desc">
+      Each soil type carries a distinct chemical signature, texture, and drainage profile — our model learns from these visual cues to make accurate identifications.
+    </p>
+  </div>
+
+  <div class="soils-grid">
+    <div class="soil-card soil-card-1">
+      <div class="sc-swatch swatch-black"></div>
+      <div class="sc-name">Black Soil</div>
+      <p class="sc-desc">High clay content, rich in lime, iron, magnesia. Retains moisture superbly.</p>
+      <div class="sc-crops">
+        <span class="sc-tag">🍅 Tomato</span>
+        <span class="sc-tag">🧅 Onion</span>
+        <span class="sc-tag">🌶 Chili</span>
+        <span class="sc-tag">🍇 Grapes</span>
+        <span class="sc-tag">🍊 Orange</span>
+      </div>
+    </div>
+    <div class="soil-card soil-card-2">
+      <div class="sc-swatch swatch-cinder"></div>
+      <div class="sc-name">Cinder Soil</div>
+      <p class="sc-desc">Volcanic origin, well-draining, porous structure with mineral richness.</p>
+      <div class="sc-crops">
+        <span class="sc-tag">🥔 Potato</span>
+        <span class="sc-tag">🥕 Carrot</span>
+        <span class="sc-tag">🍎 Apple</span>
+        <span class="sc-tag">🍐 Pear</span>
+      </div>
+    </div>
+    <div class="soil-card soil-card-3">
+      <div class="sc-swatch swatch-laterite"></div>
+      <div class="sc-name">Laterite Soil</div>
+      <p class="sc-desc">Formed by weathering in humid tropics. Rich in iron oxides, low fertility.</p>
+      <div class="sc-crops">
+        <span class="sc-tag">🍆 Brinjal</span>
+        <span class="sc-tag">🫑 Okra</span>
+        <span class="sc-tag">🥭 Mango</span>
+        <span class="sc-tag">🥜 Cashew</span>
+      </div>
+    </div>
+    <div class="soil-card soil-card-4">
+      <div class="sc-swatch swatch-peat"></div>
+      <div class="sc-name">Peat Soil</div>
+      <p class="sc-desc">High organic matter, acidic pH, excellent for moisture-loving crops.</p>
+      <div class="sc-crops">
+        <span class="sc-tag">🥬 Lettuce</span>
+        <span class="sc-tag">🥦 Spinach</span>
+        <span class="sc-tag">🫐 Blueberry</span>
+        <span class="sc-tag">🍓 Strawberry</span>
+      </div>
+    </div>
+    <div class="soil-card soil-card-5">
+      <div class="sc-swatch swatch-yellow"></div>
+      <div class="sc-name">Yellow Soil</div>
+      <p class="sc-desc">Iron-hydroxide rich, slightly acidic. Common in forest and humid areas.</p>
+      <div class="sc-crops">
+        <span class="sc-tag">🥬 Cabbage</span>
+        <span class="sc-tag">🫘 Beans</span>
+        <span class="sc-tag">🍌 Banana</span>
+        <span class="sc-tag">🍈 Papaya</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ HOW IT WORKS ═══════════════════════════ -->
+<section class="hiw-section">
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Methodology</div>
+      <h2 class="section-title">Three Steps to<br><em>Soil Clarity</em></h2>
+    </div>
+    <p class="section-desc">
+      Our pipeline takes raw field photographs through a battle-tested GAN convolutional network trained on thousands of soil images.
+    </p>
+  </div>
+
+  <div class="steps-grid">
+    <div class="step step-1">
+      <span class="step-num">01</span>
+      <h3 class="step-title">Upload Sample</h3>
+      <p class="step-desc">Photograph your soil sample in natural daylight. Our model accepts images in JPG, PNG, or WEBP format and auto-resizes to 150×150px for processing.</p>
+    </div>
+    <div class="step step-2">
+      <span class="step-num">02</span>
+      <h3 class="step-title">Neural Analysis</h3>
+      <p class="step-desc">The GAN network processes texture, color gradients, and surface patterns through 16 weight layers to extract soil-specific visual signatures.</p>
+    </div>
+    <div class="step step-3">
+      <span class="step-num">03</span>
+      <h3 class="step-title">Crop Recommendation</h3>
+      <p class="step-desc">Based on the classified soil type, the system returns curated vegetable and fruit crop recommendations optimized for that soil's chemical and physical properties.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════ FOOTER ═══════════════════════════ -->
+<footer>
+  <div class="footer-logo">SoilSense<span style="color:var(--terracotta)">.</span></div>
+  <div class="footer-copy">AI Soil Classification System · GAN</div>
+  <div class="footer-badge">Powered by TensorFlow</div>
+</footer>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursor.style.left = mx + 'px';
+    cursor.style.top = my + 'px';
+  });
+
+  (function animRing() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) *.12;
+    ring.style.left = rx + 'px';
+    ring.style.top = ry + 'px';
+    requestAnimationFrame(animRing);
+  })();
+
+  document.querySelectorAll('a,button,.soil-card,.upload-zone').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      cursor.style.width = '6px';
+      cursor.style.height = '6px';
+      ring.style.width = '50px';
+      ring.style.height = '50px';
+    });
+    el.addEventListener('mouseleave', () => {
+      cursor.style.width = '12px';
+      cursor.style.height = '12px';
+      ring.style.width = '36px';
+      ring.style.height = '36px';
+    });
+  });
+
+  // Upload zone interactions
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const previewWrap = document.getElementById('previewWrap');
+  const previewImg = document.getElementById('previewImg');
+  const uploadTitle = document.getElementById('uploadTitle');
+  const uploadSub = document.getElementById('uploadSub');
+  const uploadIcon = document.getElementById('uploadIcon');
+
+  dropZone.addEventListener('click', e => {
+    if (e.target.id !== 'analyzeBtn' && !e.target.closest('#analyzeBtn')) {
+      fileInput.click();
+    }
+  });
+
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) showPreview(e.target.files[0]);
+  });
+
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      showPreview(file);
+    }
+  });
+
+  function showPreview(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewWrap.style.display = 'block';
+      uploadTitle.textContent = file.name;
+      uploadSub.textContent = (file.size / 1024).toFixed(1) + ' KB · Ready to analyze';
+      uploadIcon.textContent = '✅';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Form submit loader
+  document.getElementById('uploadForm').addEventListener('submit', () => {
+    document.getElementById('btnText').style.display = 'none';
+    document.getElementById('btnLoading').style.display = 'flex';
+    document.getElementById('analyzeBtn').disabled = true;
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SoilSense — Analysis Results</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Mono:wght@300;400;500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --soil: #2d1f0e;
+    --earth: #4a2f12;
+    --clay: #8b4513;
+    --terracotta: #c1622a;
+    --amber: #d4853a;
+    --harvest: #e8a84c;
+    --wheat: #f2cc80;
+    --cream: #fdf6e8;
+    --sage: #6b8f5e;
+    --moss: #4a6741;
+    --fern: #3d5c35;
+    --leaf: #8fad6e;
+    --border-warm: rgba(212,133,58,0.25);
+    --border-sage: rgba(107,143,94,0.25);
+  }
+
+  /* Soil-specific accent colors */
+  .soil-black    { --card-col: #5c3317; --col-light: rgba(92,51,23,0.15); }
+  .soil-cinder   { --card-col: #5a5a5a; --col-light: rgba(90,90,90,0.15); }
+  .soil-laterite { --card-col: #c1622a; --col-light: rgba(193,98,42,0.15); }
+  .soil-peat     { --card-col: #4a6741; --col-light: rgba(74,103,65,0.15); }
+  .soil-yellow   { --card-col: #b8920a; --col-light: rgba(184,146,10,0.15); }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--soil);
+    color: var(--cream);
+    font-family: 'Lora', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 1000;
+    mix-blend-mode: overlay;
+  }
+
+  /* ── NAV ── */
+  nav {
+    padding: 28px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-warm);
+    background: rgba(26,16,8,0.7);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--cream);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .nav-dot { width: 7px; height: 7px; background: var(--terracotta); border-radius: 50%; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--cream);
+    background: transparent;
+    border: 1px solid var(--border-warm);
+    text-decoration: none;
+    transition: all 0.3s;
+  }
+  .btn-back:hover { border-color: var(--terracotta); color: var(--harvest); }
+  .result-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--harvest);
+    background: rgba(212,133,58,0.1);
+    border: 1px solid rgba(212,133,58,0.25);
+    padding: 8px 16px;
+  }
+
+  /* ── HERO RESULT BAND ── */
+  .result-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 480px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Animated gradient bg based on soil type */
+  .result-hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 80% at 0% 50%, var(--col-light, rgba(193,98,42,0.12)), transparent 60%),
+      radial-gradient(ellipse 50% 60% at 100% 20%, rgba(253,246,232,0.03), transparent 50%),
+      linear-gradient(135deg, #1a1008 0%, #2d1f0e 50%, #1a1008 100%);
+  }
+
+  /* Image side */
+  .result-image-col {
+    position: relative;
+    overflow: hidden;
+    min-height: 480px;
+  }
+  .result-image-col::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 60%, var(--soil) 100%),
+                linear-gradient(180deg, transparent 60%, rgba(26,16,8,0.5) 100%);
+  }
+  .result-image-col img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    filter: sepia(20%) contrast(1.05) brightness(0.9);
+    display: block;
+  }
+
+  /* Analysis overlay on image */
+  .scan-overlay {
+    position: absolute; inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(212,133,58,0.6), transparent);
+    box-shadow: 0 0 12px rgba(212,133,58,0.4);
+    animation: scanImage 3s ease-in-out 1 forwards;
+  }
+  @keyframes scanImage {
+    0% { top: 0%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* Corner marks on image */
+  .img-corner {
+    position: absolute;
+    width: 24px; height: 24px;
+    border-color: rgba(212,133,58,0.6);
+    border-style: solid;
+    z-index: 3;
+  }
+  .ic-tl { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
+  .ic-tr { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
+  .ic-bl { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
+  .ic-br { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
+
+  /* Result data col */
+  .result-data-col {
+    padding: 60px 60px 60px 50px;
+    position: relative; z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .result-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--harvest);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    opacity: 0;
+    animation: slideIn 0.6s 0.3s forwards;
+  }
+  .result-eyebrow::before { content: ''; display: block; width: 28px; height: 1px; background: var(--harvest); }
+
+  .result-soil-name {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(48px, 5vw, 78px);
+    font-weight: 900;
+    line-height: 1.0;
+    letter-spacing: -2px;
+    margin-bottom: 8px;
+    opacity: 0;
+    animation: slideIn 0.6s 0.5s forwards;
+  }
+  .result-soil-name em {
+    display: block;
+    font-style: italic;
+    color: var(--card-col, var(--terracotta));
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Confidence bar */
+  .confidence-wrap {
+    margin: 28px 0;
+    opacity: 0;
+    animation: slideIn 0.6s 0.7s forwards;
+  }
+  .conf-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .conf-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.5);
+  }
+  .conf-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--card-col, var(--harvest));
+    line-height: 1;
+  }
+  .conf-value small { font-size: 18px; color: rgba(253,246,232,0.5); font-family: 'Lora', serif; font-weight: 400; }
+  .conf-track {
+    height: 6px;
+    background: rgba(253,246,232,0.08);
+    position: relative;
+    overflow: hidden;
+  }
+  .conf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--card-col, var(--terracotta)), var(--harvest));
+    width: 0%;
+    transition: width 1.5s cubic-bezier(.4,0,.2,1) 0.8s;
+    position: relative;
+  }
+  .conf-fill::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--cream);
+    box-shadow: 0 0 8px rgba(253,246,232,0.6);
+  }
+
+  /* Result meta chips */
+  .result-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: slideIn 0.6s 0.9s forwards;
+  }
+  .meta-chip {
+    padding: 8px 16px;
+    background: rgba(253,246,232,0.05);
+    border: 1px solid rgba(253,246,232,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .mc-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.4);
+  }
+  .mc-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--cream);
+  }
+
+  /* ── CROPS SECTION ── */
+  .crops-section {
+    padding: 80px 60px;
+    position: relative;
+  }
+  .crops-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-warm), transparent);
+  }
+
+  .crops-header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    margin-bottom: 48px;
+  }
+  .crops-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 40px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+  .crops-title em { font-style: italic; color: var(--sage); }
+  .crops-desc {
+    max-width: 360px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: rgba(253,246,232,0.5);
+  }
+
+  /* Crops grid */
+  .crops-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    background: rgba(212,133,58,0.06);
+  }
+
+  .crop-category {
+    background: #1a1008;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .crop-category::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    width: 3px;
+  }
+  .veg-cat::before { background: var(--sage); }
+  .fruit-cat::before { background: var(--harvest); }
+
+  .cc-icon {
+    font-size: 36px;
+    display: block;
+    margin-bottom: 12px;
+  }
+  .cc-type {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .veg-cat .cc-type { color: var(--sage); }
+  .fruit-cat .cc-type { color: var(--harvest); }
+
+  .cc-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 28px;
+    color: var(--cream);
+  }
+
+  .crop-list { display: flex; flex-direction: column; gap: 2px; }
+
+  .crop-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 16px;
+    background: rgba(253,246,232,0.03);
+    border-left: 2px solid transparent;
+    transition: all 0.35s cubic-bezier(.4,0,.2,1);
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  .crop-item.visible {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  .crop-item::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(253,246,232,0.03), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .crop-item:hover {
+    background: rgba(253,246,232,0.06);
+    padding-left: 22px;
+  }
+  .crop-item:hover::after { opacity: 1; }
+  .veg-cat .crop-item:hover { border-left-color: var(--sage); }
+  .fruit-cat .crop-item:hover { border-left-color: var(--harvest); }
+
+  .crop-emoji {
+    font-size: 28px;
+    flex-shrink: 0;
+    transition: transform 0.3s;
+  }
+  .crop-item:hover .crop-emoji { transform: scale(1.15) rotate(-5deg); }
+
+  .crop-info { flex: 1; }
+  .crop-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--cream);
+    margin-bottom: 2px;
+  }
+  .crop-detail {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.35);
+  }
+  .crop-suitability {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .suit-bar {
+    height: 3px;
+    width: 28px;
+    background: rgba(253,246,232,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  .suit-fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    background: var(--card-col, var(--sage));
+    transition: width 1s ease 0.5s;
+  }
+
+  /* ── SOIL PROPERTIES ── */
+  .properties-section {
+    padding: 80px 60px;
+    background: linear-gradient(180deg, #1a1008 0%, var(--soil) 100%);
+    position: relative;
+  }
+  .properties-section::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-warm), transparent);
+  }
+
+  .props-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    background: rgba(212,133,58,0.06);
+    margin-top: 48px;
+  }
+  .prop-card {
+    background: #1a1008;
+    padding: 32px 24px;
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transition: all 0.4s;
+    animation: propReveal 0.6s forwards;
+  }
+  .prop-card:nth-child(1) { animation-delay: 0.1s; }
+  .prop-card:nth-child(2) { animation-delay: 0.2s; }
+  .prop-card:nth-child(3) { animation-delay: 0.3s; }
+  .prop-card:nth-child(4) { animation-delay: 0.4s; }
+  @keyframes propReveal {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .prop-card:hover { background: rgba(253,246,232,0.03); }
+  .prop-icon { font-size: 28px; margin-bottom: 16px; display: block; }
+  .prop-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: rgba(253,246,232,0.4);
+    margin-bottom: 8px;
+  }
+  .prop-value {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--harvest);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .prop-sub {
+    font-size: 12px;
+    color: rgba(253,246,232,0.4);
+    font-style: italic;
+  }
+  .prop-meter {
+    height: 3px;
+    background: rgba(253,246,232,0.08);
+    margin-top: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pm-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--card-col, var(--terracotta)), var(--harvest));
+    width: 0;
+    animation: meterFill 1.5s cubic-bezier(.4,0,.2,1) forwards;
+    animation-delay: 0.6s;
+  }
+  @keyframes meterFill { to { width: var(--meter-pct, 60%); } }
+
+  /* ── TRY ANOTHER ── */
+  .try-section {
+    padding: 80px 60px;
+    text-align: center;
+    position: relative;
+    border-top: 1px solid var(--border-warm);
+  }
+  .try-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    font-weight: 900;
+    margin-bottom: 16px;
+  }
+  .try-title em { font-style: italic; color: var(--terracotta); }
+  .try-sub {
+    font-size: 15px;
+    color: rgba(253,246,232,0.5);
+    margin-bottom: 36px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.7;
+  }
+  .btn-try {
+    display: inline-block;
+    padding: 18px 48px;
+    background: linear-gradient(135deg, var(--terracotta), var(--clay));
+    color: var(--cream);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+    clip-path: polygon(16px 0%, 100% 0%, calc(100% - 16px) 100%, 0% 100%);
+    transition: all 0.3s;
+  }
+  .btn-try::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn-try:hover::before { opacity: 1; }
+  .btn-try:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(193,98,42,0.4); }
+
+  /* Crop emoji mapping per vegetable */
+  /* These will be set inline via Jinja */
+
+  /* Footer */
+  footer {
+    padding: 32px 60px;
+    border-top: 1px solid var(--border-warm);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1a1008;
+  }
+  .footer-logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 900;
+  }
+  .footer-copy {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(253,246,232,0.3);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<!-- We apply soil-specific class to body for CSS variable theming -->
+<!-- Jinja sets class based on predicted soil type -->
+<script>
+  // Soil classification applied by Python backend (see below)
+  // For standalone preview we can set manually
+  const soilName = "{{ soil }}";
+  const soilClass = {
+    "Black Soil": "soil-black",
+    "Cinder Soil": "soil-cinder",
+    "Laterite Soil": "soil-laterite",
+    "Peat Soil": "soil-peat",
+    "Yellow Soil": "soil-yellow"
+  }[soilName] || "soil-laterite";
+  document.body.classList.add(soilClass);
+
+  // Apply to result-hero
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelector('.result-hero').classList.add(soilClass);
+    document.querySelectorAll('.conf-fill,.pm-fill').forEach(el => {
+      el.closest('[class*="soil"]') || el.classList.add(soilClass);
+    });
+  });
+</script>
+
+<!-- ── NAV ── -->
+<nav>
+  <a href="/" class="nav-logo">SoilSense<span class="nav-dot"></span></a>
+  <div class="nav-right">
+    <span class="result-badge">Analysis Complete</span>
+    <a href="/" class="btn-back">← New Analysis</a>
+  </div>
+</nav>
+
+<!-- ── RESULT HERO ── -->
+<section class="result-hero">
+  <!-- Image column -->
+  <div class="result-image-col">
+    <img src="{{ image_path }}" alt="Soil Sample">
+    <div class="scan-overlay">
+      <div class="scan-line"></div>
+    </div>
+    <div class="img-corner ic-tl"></div>
+    <div class="img-corner ic-tr"></div>
+    <div class="img-corner ic-bl"></div>
+    <div class="img-corner ic-br"></div>
+  </div>
+
+  <!-- Data column -->
+  <div class="result-data-col">
+    <div class="result-eyebrow">Classification Result</div>
+
+    <h1 class="result-soil-name">
+      Identified as<br>
+      <em>{{ soil }}</em>
+    </h1>
+
+    <!-- Confidence -->
+    <div class="confidence-wrap">
+      <div class="conf-header">
+        <span class="conf-label">Confidence Score</span>
+        <span class="conf-value">{{ confidence }}<small>%</small></span>
+      </div>
+      <div class="conf-track">
+        <div class="conf-fill" id="confFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Meta -->
+    <div class="result-meta">
+      <div class="meta-chip">
+        <span class="mc-label">Model</span>
+        <span class="mc-val">GAN</span>
+      </div>
+      <div class="meta-chip">
+        <span class="mc-label">Vegetables</span>
+        <span class="mc-val">{{ vegetables|length }} types</span>
+      </div>
+      <div class="meta-chip">
+        <span class="mc-label">Fruits</span>
+        <span class="mc-val">{{ fruits|length }} types</span>
+      </div>
+      <div class="meta-chip">
+        <span class="mc-label">Resolution</span>
+        <span class="mc-val">150×150</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CROPS SECTION ── -->
+<section class="crops-section">
+  <div class="crops-header">
+    <div>
+      <div style="font-family:'DM Mono',monospace; font-size:10px; letter-spacing:4px; color:var(--harvest); text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+        <span style="display:block; width:28px; height:1px; background:var(--harvest)"></span>
+        Crop Intelligence
+      </div>
+      <h2 class="crops-title">
+        Recommended<br>
+        <em>Crops for Your Soil</em>
+      </h2>
+    </div>
+    <p class="crops-desc">
+      Based on the identified soil profile, these crops offer optimal yield potential, compatible root requirements, and pH compatibility.
+    </p>
+  </div>
+
+  <div class="crops-grid">
+    <!-- Vegetables -->
+    <div class="crop-category veg-cat">
+      <span class="cc-icon">🥬</span>
+      <div class="cc-type">Category</div>
+      <h3 class="cc-title">Vegetables</h3>
+      <div class="crop-list" id="vegList">
+        {% set veg_emojis = {
+          'Tomato': '🍅', 'Onion': '🧅', 'Chili': '🌶️',
+          'Potato': '🥔', 'Carrot': '🥕', 'Brinjal': '🍆',
+          'Okra': '🫑', 'Lettuce': '🥬', 'Spinach': '🥦',
+          'Cabbage': '🥬', 'Beans': '🫘'
+        } %}
+        {% set veg_details = {
+          'Tomato': 'High yield · 75-90 days', 'Onion': 'Bulb crop · 90-120 days',
+          'Chili': 'Spice crop · 60-90 days', 'Potato': 'Root crop · 70-120 days',
+          'Carrot': 'Root vegetable · 70-80 days', 'Brinjal': 'Tropical crop · 65-80 days',
+          'Okra': 'Fast grower · 50-65 days', 'Lettuce': 'Leafy green · 45-60 days',
+          'Spinach': 'Nutrient-rich · 35-50 days', 'Cabbage': 'Cool-season · 80-180 days',
+          'Beans': 'Legume crop · 50-60 days'
+        } %}
+        {% set suit_pcts = ['95%','88%','82%','90%','85%'] %}
+        {% for veg in vegetables %}
+        <div class="crop-item" style="transition-delay: {{ loop.index * 0.1 }}s">
+          <span class="crop-emoji">{{ veg_emojis.get(veg, '🌿') }}</span>
+          <div class="crop-info">
+            <div class="crop-name">{{ veg }}</div>
+            <div class="crop-detail">{{ veg_details.get(veg, 'Suitable crop') }}</div>
+          </div>
+          <div class="crop-suitability">
+            <div class="suit-bar">
+              <div class="suit-fill" style="width:{{ suit_pcts[loop.index0 % 5] }}"></div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Fruits -->
+    <div class="crop-category fruit-cat">
+      <span class="cc-icon">🍇</span>
+      <div class="cc-type">Category</div>
+      <h3 class="cc-title">Fruits</h3>
+      <div class="crop-list" id="fruitList">
+        {% set fruit_emojis = {
+          'Grapes': '🍇', 'Orange': '🍊', 'Pomegranate': '🍎',
+          'Apple': '🍎', 'Pear': '🍐', 'Cashew': '🥜',
+          'Mango': '🥭', 'Blueberry': '🫐', 'Strawberry': '🍓',
+          'Banana': '🍌', 'Papaya': '🍈'
+        } %}
+        {% set fruit_details = {
+          'Grapes': 'Vine fruit · 2-3 year yield', 'Orange': 'Citrus tree · 3-5 years',
+          'Pomegranate': 'Drought tolerant · 2-3 years', 'Apple': 'Deciduous · 2-5 years',
+          'Pear': 'Cool climate · 3-5 years', 'Cashew': 'Tropical tree · 3 years',
+          'Mango': 'Tropical tree · 3-5 years', 'Blueberry': 'Acidic soil · 2-3 years',
+          'Strawberry': 'Ground cover · 1-2 years', 'Banana': 'Fast grower · 9-12 months',
+          'Papaya': 'Tropical · 9-11 months'
+        } %}
+        {% for fruit in fruits %}
+        <div class="crop-item" style="transition-delay: {{ loop.index * 0.1 }}s">
+          <span class="crop-emoji">{{ fruit_emojis.get(fruit, '🍑') }}</span>
+          <div class="crop-info">
+            <div class="crop-name">{{ fruit }}</div>
+            <div class="crop-detail">{{ fruit_details.get(fruit, 'Suitable crop') }}</div>
+          </div>
+          <div class="crop-suitability">
+            <div class="suit-bar">
+              <div class="suit-fill" style="width:{{ suit_pcts[loop.index0 % 5] }}"></div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SOIL PROPERTIES ── -->
+<section class="properties-section">
+  <div style="font-family:'DM Mono',monospace; font-size:10px; letter-spacing:4px; color:var(--harvest); text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+    <span style="display:block; width:28px; height:1px; background:var(--harvest)"></span>
+    Soil Properties
+  </div>
+  <h2 style="font-family:'Playfair Display',serif; font-size:38px; font-weight:900; letter-spacing:-1px;">
+    Chemical &amp; Physical <em style="font-style:italic; color:var(--sage)">Profile</em>
+  </h2>
+
+  <div class="props-grid" id="propsGrid">
+    <!-- Dynamic properties per soil type injected by JS below -->
+  </div>
+</section>
+
+<!-- ── TRY ANOTHER ── -->
+<section class="try-section">
+  <h2 class="try-title">Analyze <em>Another</em><br>Soil Sample?</h2>
+  <p class="try-sub">Upload a new image to classify a different soil type and get fresh crop recommendations.</p>
+  <a href="/" class="btn-try">← Analyze New Sample</a>
+</section>
+
+<footer>
+  <div class="footer-logo">SoilSense<span style="color:var(--terracotta)">.</span></div>
+  <div class="footer-copy">Analysis Generated by GAN Neural Network</div>
+</footer>
+
+<script>
+  // ── Confidence fill animation ──
+  window.addEventListener('load', () => {
+    const fill = document.getElementById('confFill');
+    if (fill) {
+      setTimeout(() => {
+        fill.style.width = '{{ confidence }}%';
+      }, 300);
+    }
+
+    // Animate crop items in
+    const items = document.querySelectorAll('.crop-item');
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    items.forEach(item => observer.observe(item));
+  });
+
+  // ── Soil Properties Data ──
+  const SOIL_PROPS = {
+    "Black Soil": [
+      { icon: "🧪", label: "pH Level", value: "7.5–8.5", sub: "Slightly alkaline", pct: "75%" },
+      { icon: "💧", label: "Water Retention", value: "Very High", sub: "Swells when wet", pct: "90%" },
+      { icon: "🔬", label: "Clay Content", value: "30–80%", sub: "Montmorillonite rich", pct: "80%" },
+      { icon: "🌾", label: "Fertility", value: "High", sub: "Rich in Ca, Mg, K", pct: "85%" }
+    ],
+    "Cinder Soil": [
+      { icon: "🌋", label: "pH Level", value: "6.0–7.0", sub: "Near neutral", pct: "60%" },
+      { icon: "💧", label: "Water Retention", value: "Low", sub: "High drainage", pct: "30%" },
+      { icon: "🔬", label: "Texture", value: "Coarse", sub: "Volcanic origin", pct: "65%" },
+      { icon: "🌾", label: "Mineral Content", value: "High", sub: "Volcanic minerals", pct: "70%" }
+    ],
+    "Laterite Soil": [
+      { icon: "🧪", label: "pH Level", value: "4.5–6.0", sub: "Acidic", pct: "45%" },
+      { icon: "💧", label: "Water Retention", value: "Low–Medium", sub: "Leaches easily", pct: "45%" },
+      { icon: "🔬", label: "Iron Oxide", value: "Very High", sub: "Fe₂O₃ rich", pct: "90%" },
+      { icon: "🌾", label: "Fertility", value: "Low–Medium", sub: "Needs enrichment", pct: "40%" }
+    ],
+    "Peat Soil": [
+      { icon: "🧪", label: "pH Level", value: "3.5–5.5", sub: "Highly acidic", pct: "35%" },
+      { icon: "💧", label: "Water Retention", value: "Extreme", sub: "Sponge-like", pct: "95%" },
+      { icon: "🔬", label: "Organic Matter", value: "> 20%", sub: "Decomposed plants", pct: "95%" },
+      { icon: "🌾", label: "Nitrogen Content", value: "High", sub: "Slowly released", pct: "80%" }
+    ],
+    "Yellow Soil": [
+      { icon: "🧪", label: "pH Level", value: "5.0–6.5", sub: "Slightly acidic", pct: "55%" },
+      { icon: "💧", label: "Water Retention", value: "Medium", sub: "Moderate drainage", pct: "60%" },
+      { icon: "🔬", label: "Iron Hydroxide", value: "High", sub: "Fe(OH)₃ content", pct: "75%" },
+      { icon: "🌾", label: "Organic Content", value: "Medium", sub: "Forest-derived", pct: "55%" }
+    ]
+  };
+
+  const soilNameData = "{{ soil }}";
+  const props = SOIL_PROPS[soilNameData] || SOIL_PROPS["Laterite Soil"];
+
+  const grid = document.getElementById('propsGrid');
+  grid.innerHTML = props.map(p => `
+    <div class="prop-card">
+      <span class="prop-icon">${p.icon}</span>
+      <div class="prop-label">${p.label}</div>
+      <div class="prop-value">${p.value}</div>
+      <div class="prop-sub">${p.sub}</div>
+      <div class="prop-meter">
+        <div class="pm-fill" style="--meter-pct: ${p.pct}"></div>
+      </div>
+    </div>
+  `).join('');
+</script>
+</body>
+</html>
